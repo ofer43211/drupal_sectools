@@ -15,14 +15,17 @@ define('DRUPAL_PROJECT_USAGE_URL', 'https://drupal.org/project/usage/');
 /**
  * User agent to use for HTTP Requests to Drupal.org
  */
-define('MODULES_USAGES_USER_AGENT', 'Mozilla/5.0 DrupalUsagesBot/1.0.0 (https://github.com/ibuildingsnl/modules_usages)');
+define(
+  'DRUPAL_SECTOOLS_USAGE_USER_AGENT',
+  'Mozilla/5.0 DrupalSecToolsBot/1.0.0 (https://github.com/ibuildingsnl/drupal_sectools)'
+);
 
 /**
  * Register 'modules-usages-status' command.
  *
  * @implements hook_drush_command()
  */
-function modules_usages_drush_command() {
+function drupal_sectools_usage_drush_command() {
   $items = array();
 
   $items['modules-usages-status'] = array(
@@ -35,11 +38,12 @@ function modules_usages_drush_command() {
 }
 
 /**
+ *
  * @return string
  */
-function drush_modules_usages_status() {
+function drush_drupal_sectools_usage_status() {
   drush_log('Getting modules', 'info');
-  $modules = modules_usages_drush_get_modules();
+  $modules = drupal_sectools_usage_drush_get_modules();
   if ($modules === NULL) {
     return t("Modules list could not load.");
   }
@@ -61,13 +65,13 @@ function drush_modules_usages_status() {
 
     drush_log('Getting info for module: ' . $name, 'info');
 
-    $info = modules_usages_get_info_by_name_and_version($module->info['project'], $module->info['version']);
+    $info = drupal_sectools_usage_get_info_by_name_and_version($module->info['project'], $module->info['version']);
 
     $row = array(
       'name'                  => $name,
       'enabled'               => (int) $module->status ? 'enabled' : 'installed',
       'php'                   => $module->info['php'],
-      'stability'             => drush_modules_usages_get_stability_from_version($module->info['version']),
+      'stability'             => drupal_sectools_usage_get_stability_from_version($module->info['version']),
       'version'               => $module->info['version'],
       'usages'                => !isset($info['usages'])                 ? 0 : $info['usages'],
       'latest_version'        => !isset($info['latest_version'])         ? '' : $info['latest_version'],
@@ -79,7 +83,7 @@ function drush_modules_usages_status() {
 
   drush_log('Generating CSV', 'info');
 
-  return modules_usages_to_csv($rows);
+  return drupal_sectools_usage_to_csv($rows);
 }
 
 /**
@@ -87,7 +91,7 @@ function drush_modules_usages_status() {
  *
  * Equivalent Drush command: drush pm-list --type=Module --status=enabled
  */
-function modules_usages_drush_get_modules() {
+function drupal_sectools_usage_drush_get_modules() {
   // Drupal 7 uses system_rebuild_module_data
   if (function_exists('system_rebuild_module_data')) {
     return system_rebuild_module_data();
@@ -114,10 +118,10 @@ function modules_usages_drush_get_modules() {
  * @return array
  *   Array with 'latest_version', 'latest_version_usages', 'usages'.
  */
-function modules_usages_get_info_by_name_and_version($project, $version) {
+function drupal_sectools_usage_get_info_by_name_and_version($project, $version) {
 
   $url = DRUPAL_PROJECT_USAGE_URL . $project;
-  $file = modules_usages_drush_download_file($url, FALSE, 24 * 3600);
+  $file = drupal_sectools_usage_drush_download_file($url, FALSE, 24 * 3600);
 
   if (!$file) {
     drush_log('Project ' . $project . ' does not appear to be listed on Drupal.org', 'notice');
@@ -181,7 +185,7 @@ function modules_usages_get_info_by_name_and_version($project, $version) {
  *   The path to the downloaded file, or FALSE if the file could not be
  *   downloaded.
  */
-function modules_usages_drush_download_file($url, $destination = FALSE, $cache_duration = 0) {
+function drupal_sectools_usage_drush_download_file($url, $destination = FALSE, $cache_duration = 0) {
   // Generate destination of omitted.
   if (!$destination) {
     $file = basename(current(explode('?', $url, 2)));
@@ -192,11 +196,11 @@ function modules_usages_drush_download_file($url, $destination = FALSE, $cache_d
     $cache_name = str_replace(array(':', '/', '?', '='), '-', $url);
     $cache_file = $cache_dir . "/" . $cache_name;
     // Check for cached, unexpired file.
-    if (file_exists($cache_file) && filectime($cache_file) > ($_SERVER['REQUEST_TIME']-$cache_duration)) {
+    if (file_exists($cache_file) && filectime($cache_file) > ($_SERVER['REQUEST_TIME'] - $cache_duration)) {
       drush_log(dt('!name retrieved from cache.', array('!name' => $cache_name)));
     }
     else {
-      if (_modules_usages_drush_download_file($url, $cache_file, TRUE)) {
+      if (_drupal_sectools_usage_drush_download_file($url, $cache_file, TRUE)) {
         // Cache was set just by downloading file to right location.
       }
       elseif (file_exists($cache_file)) {
@@ -212,7 +216,7 @@ function modules_usages_drush_download_file($url, $destination = FALSE, $cache_d
       return $destination;
     }
   }
-  elseif ($return = _modules_usages_drush_download_file($url, $destination)) {
+  elseif ($return = _drupal_sectools_usage_drush_download_file($url, $destination)) {
     drush_register_file_for_deletion($return);
     return $return;
   }
@@ -235,7 +239,7 @@ function modules_usages_drush_download_file($url, $destination = FALSE, $cache_d
  *   The path to the downloaded file, or FALSE if the file could not be
  *   downloaded.
  */
-function _modules_usages_drush_download_file($url, $destination, $overwrite = TRUE) {
+function _drupal_sectools_usage_drush_download_file($url, $destination, $overwrite = TRUE) {
   static $use_wget;
   if ($use_wget === NULL) {
     $use_wget = drush_shell_exec('which wget');
@@ -275,7 +279,7 @@ function _modules_usages_drush_download_file($url, $destination, $overwrite = TR
  * @return string
  *   CSV
  */
-function modules_usages_to_csv($rows) {
+function drupal_sectools_usage_to_csv($rows) {
   if (count($rows) === 0) {
     return '';
   }
@@ -304,7 +308,7 @@ function modules_usages_to_csv($rows) {
  * @return string
  *   Stability (Unstable, Dev, Alpha, Beta, Stable)
  */
-function drush_modules_usages_get_stability_from_version($version) {
+function drupal_sectools_usage_get_stability_from_version($version) {
   $results = array();
   if (preg_match('/-(?P<version>.*)/', $version, $results) === 1) {
     $version = $results['version'];

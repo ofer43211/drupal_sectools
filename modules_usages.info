@@ -1,8 +1,0 @@
-name = Modules usages
-description = Get usage information for all modules from Drupal.org.
-package = Other
-core = 7.x
-version = "7.x-1.0"
-core = "7.x"
-project = "modules_usages"
-datestamp = "1328692247"

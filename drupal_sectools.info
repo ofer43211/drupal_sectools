@@ -1,0 +1,10 @@
+name = Drupal Security Tools
+description = Collection of tools for auditting the security of Drupal installations.
+package = Security
+project = drupal_sectools
+core = 7.x
+version = "7.x-1.0"
+datestamp = "1365601035"
+
+dependencies[] = drupal_sectools_usage
+
