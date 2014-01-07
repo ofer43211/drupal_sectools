@@ -41,7 +41,7 @@ function drupal_sectools_usage_drush_command() {
  *
  * @return string
  */
-function drush_drupal_sectools_usage_status() {
+function drush_drupal_sectools_usage_modules_usages_status() {
   drush_log('Getting modules', 'info');
   $modules = drupal_sectools_usage_drush_get_modules();
   if ($modules === NULL) {
@@ -62,7 +62,7 @@ function drush_drupal_sectools_usage_status() {
     if ($is_part_of_core || $is_drupal) {
       continue;
     }
-
+    
     drush_log('Getting info for module: ' . $name, 'info');
 
     $info = drupal_sectools_usage_get_info_by_name_and_version($module->info['project'], $module->info['version']);
@@ -80,7 +80,6 @@ function drush_drupal_sectools_usage_status() {
 
     $rows[] = $row;
   }
-
   drush_log('Generating CSV', 'info');
 
   return drupal_sectools_usage_to_csv($rows);
@@ -310,27 +309,29 @@ function drupal_sectools_usage_to_csv($rows) {
  */
 function drupal_sectools_usage_get_stability_from_version($version) {
   $results = array();
+
+  // Strip off the version of Drupal, so 7.x-1.5 becomes 1.5
   if (preg_match('/-(?P<version>.*)/', $version, $results) === 1) {
     $version = $results['version'];
   }
 
-  if (preg_match('/[\d\.]+/', $version) === 1) {
-    $status = 'Stable';
-  }
-  elseif (strpos($version, 'beta') !== FALSE) {
+  if (strpos($version, 'beta') !== FALSE) {
     $status = 'Beta';
   }
   elseif (strpos($version, 'alpha') !== FALSE) {
     $status = 'Alpha';
-  }
-  elseif (strpos($version, 'dev') !== FALSE) {
-    $status = 'Dev';
   }
   elseif (strpos($version, 'unstable') !== FALSE) {
     $status = 'Unstable';
   }
   elseif (strpos($version, 'rc') !== FALSE) {
     $status = 'RC';
+  }
+  elseif (strpos($version, 'dev') !== FALSE) {
+    $status = 'Dev';
+  }
+  elseif (preg_match('/[\d\.]+/', $version) === 1) {
+    $status = 'Stable';
   }
   else {
     $status = 'Unknown';
