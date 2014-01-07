@@ -52,7 +52,7 @@ function drush_drupal_sectools_usage_modules_usages_status() {
   foreach ($modules as $name => $module) {
     $belongs_to_project = isset($module->info['project']);
     $is_part_of_core = (isset($module->info['package']) && $module->info['package'] === 'Core');
-    $is_drupal       = ($belongs_to_project && $module->info['project'] === 'drupal');
+    $is_drupal     = ($belongs_to_project && $module->info['project'] === 'drupal');
 
     if (!$belongs_to_project) {
       drush_log('Skipping: ' . $name . ', does not belong to a project', 'warn');
@@ -62,19 +62,20 @@ function drush_drupal_sectools_usage_modules_usages_status() {
     if ($is_part_of_core || $is_drupal) {
       continue;
     }
-    
+
     drush_log('Getting info for module: ' . $name, 'info');
 
     $info = drupal_sectools_usage_get_info_by_name_and_version($module->info['project'], $module->info['version']);
 
     $row = array(
-      'name'                  => $name,
+      'project'               => $module->info['project'],
+      'module'                => $name,
       'enabled'               => (int) $module->status ? 'enabled' : 'installed',
       'php'                   => $module->info['php'],
       'stability'             => drupal_sectools_usage_get_stability_from_version($module->info['version']),
       'version'               => $module->info['version'],
-      'usages'                => !isset($info['usages'])                 ? 0 : $info['usages'],
-      'latest_version'        => !isset($info['latest_version'])         ? '' : $info['latest_version'],
+      'usages'                => !isset($info['usages'])         ? 0 : $info['usages'],
+      'latest_version'        => !isset($info['latest_version'])     ? '' : $info['latest_version'],
       'latest_version_usages' => !isset($info['latest_version_usages'])  ? 0 : $info['latest_version_usages'],
     );
 
@@ -133,29 +134,30 @@ function drupal_sectools_usage_get_info_by_name_and_version($project, $version) 
   @$document->loadHTML($html);
 
   $xpath = new DOMXPath($document);
-  $project_version_nodes       = $xpath->query('//table[@id="project-usage-project-releases"]/tbody/tr/td[@class="active"]/a');
+  $project_version_nodes     = $xpath->query('//table[@id="project-usage-project-releases"]/tbody/tr/td[@class="active"]/a');
   $project_version_usage_nodes = $xpath->query('//table[@id="project-usage-project-releases"]/tbody/tr/td[@class="project-usage-numbers"][1]');
 
   $info = array();
-  $usage = 0;
 
-  foreach ($project_version_nodes as $item_nr => $node) {
+  // From the oldest to the newest release...
+  for ($item_nr = $project_version_nodes->length - 1; $item_nr >= 0; $item_nr--) {
+    $node = $project_version_nodes->item($item_nr);
     $project_version = trim($node->textContent);
-
-    $info['latest_version'] = $project_version;
+    $is_stable_version = (drupal_sectools_usage_get_stability_from_version($project_version) === 'Stable');
 
     $corresponding_version_usage_node = $project_version_usage_nodes->item($item_nr);
-    $usage += (int) trim($corresponding_version_usage_node->textContent);
-    $info['latest_version_usages'] = (int) trim($corresponding_version_usage_node->textContent);
+    // Remove any thousand separators and cast to an int (usages are never floats, can't partially install a project)
+    $usage = (int) str_replace(array(',', '.'), '', $corresponding_version_usage_node->textContent);
 
-    if ($project_version !== $version) {
-      continue;
+    // Keep setting the latest_version.
+    if (!isset($info['latest_version']) || $is_stable_version) {
+      $info['latest_version'] = $project_version;
+      $info['latest_version_usages'] = $usage;
     }
 
-    if (!isset($usages['usages'])) {
-      $corresponding_version_usage_node = $project_version_usage_nodes->item($item_nr);
-      $usage += (int) trim($corresponding_version_usage_node->textContent);
-      $info['usages'] = (int) trim($corresponding_version_usage_node->textContent);
+    // If this version is the installed version, then note the usage for this version
+    if ($version && strpos($version, $project_version) === 0) {
+      $info['usages'] = $usage;
     }
   }
 
@@ -243,21 +245,20 @@ function _drupal_sectools_usage_drush_download_file($url, $destination, $overwri
   if ($use_wget === NULL) {
     $use_wget = drush_shell_exec('which wget');
   }
-
   $destination_tmp = drush_tempnam('download_file');
   if ($use_wget) {
-    drush_shell_exec("wget --no-check-certificate -q --timeout=30 --user-agent=" . escapeshellarg(MODULES_USAGES_USER_AGENT) . " -O %s %s", $destination_tmp, $url);
+    drush_shell_exec("wget --no-check-certificate -q --timeout=30 --user-agent=" . escapeshellarg(DRUPAL_SECTOOLS_USAGE_USER_AGENT) . " -O %s %s", $destination_tmp, $url);
   }
   else {
-    drush_shell_exec("curl --fail -s -L --connect-timeout 30 --user-agent " . escapeshellarg(MODULES_USAGES_USER_AGENT) . " -o %s %s", $destination_tmp, $url);
+    drush_shell_exec("curl --fail -s -L --connect-timeout 30 --user-agent " . escapeshellarg(DRUPAL_SECTOOLS_USAGE_USER_AGENT) . " -o %s %s", $destination_tmp, $url);
   }
   if (!drush_file_not_empty($destination_tmp) && $file = @file_get_contents($url)) {
     @file_put_contents($destination_tmp, $file);
   }
 // HACKED: Also cache 404s
 //  if (!drush_file_not_empty($destination_tmp)) {
-//    // Download failed.
-//    return FALSE;
+//  // Download failed.
+//  return FALSE;
 //  }
 //
   drush_move_dir($destination_tmp, $destination, $overwrite);
